@@ -2,9 +2,15 @@
 Memory Manager Module
 Handles core memory operations: allocation, deallocation, and memory structure management
 OS Concepts: Segmentation, First-Fit, Best-Fit, Worst-Fit, Next-Fit Allocation, Dynamic Partitioning
+
+Coalescing Modes:
+  "immediate" — adjacent free blocks are merged right after every deallocation (default).
+  "deferred"  — free blocks are NOT merged on deallocation; merging is triggered lazily
+                 only when an allocation attempt fails, giving it one retry chance.
 """
 
-ALGORITHMS = ["First-Fit", "Best-Fit", "Worst-Fit", "Next-Fit"]
+ALGORITHMS       = ["First-Fit", "Best-Fit", "Worst-Fit", "Next-Fit"]
+COALESCING_MODES = ["Immediate", "Deferred"]
 
 class MemoryManager:
     def __init__(self):
@@ -13,6 +19,8 @@ class MemoryManager:
         self.block_size = 10    # Fixed block size for internal fragmentation simulation
         # Next-Fit: persists across allocations so scanning resumes from last position
         self.next_fit_index = 0
+        # Coalescing strategy: "immediate" or "deferred"
+        self.coalescing_mode = "immediate"
 
     def initialize_memory(self, size):
         """Initialize memory with given size"""
@@ -45,9 +53,11 @@ class MemoryManager:
         """First-Fit: scan from start, pick the FIRST block that fits.
         Fast but can leave many small fragments at the front."""
         for i, block in enumerate(self.memory):
-            if block["type"] == "free" and block["size"] >= allocated_size:
-                base = self._place(i, seg_name, allocated_size)
-                return True, base, allocated_size
+            if block["type"] == "free":
+                print(f"[First-Fit]  Trying block of size {block['size']} KB for request {allocated_size} KB")
+                if block["size"] >= allocated_size:
+                    base = self._place(i, seg_name, allocated_size)
+                    return True, base, allocated_size
         return False, 0, 0
 
     def _best_fit(self, seg_name, allocated_size):
@@ -56,10 +66,12 @@ class MemoryManager:
         best_i = -1
         best_size = float("inf")
         for i, block in enumerate(self.memory):
-            if block["type"] == "free" and block["size"] >= allocated_size:
-                if block["size"] < best_size:
-                    best_size = block["size"]
-                    best_i = i
+            if block["type"] == "free":
+                print(f"[Best-Fit]   Trying block of size {block['size']} KB for request {allocated_size} KB")
+                if block["size"] >= allocated_size:
+                    if block["size"] < best_size:
+                        best_size = block["size"]
+                        best_i = i
         if best_i == -1:
             return False, 0, 0
         base = self._place(best_i, seg_name, allocated_size)
@@ -71,10 +83,12 @@ class MemoryManager:
         worst_i = -1
         worst_size = -1
         for i, block in enumerate(self.memory):
-            if block["type"] == "free" and block["size"] >= allocated_size:
-                if block["size"] > worst_size:
-                    worst_size = block["size"]
-                    worst_i = i
+            if block["type"] == "free":
+                print(f"[Worst-Fit]  Trying block of size {block['size']} KB for request {allocated_size} KB")
+                if block["size"] >= allocated_size:
+                    if block["size"] > worst_size:
+                        worst_size = block["size"]
+                        worst_i = i
         if worst_i == -1:
             return False, 0, 0
         base = self._place(worst_i, seg_name, allocated_size)
@@ -88,12 +102,14 @@ class MemoryManager:
         for offset in range(n):
             i = (self.next_fit_index + offset) % n
             block = self.memory[i]
-            if block["type"] == "free" and block["size"] >= allocated_size:
-                base = self._place(i, seg_name, allocated_size)
-                # Advance pointer past the just-placed block; wrap with current length
-                # (_place may have inserted a new block, so re-read len)
-                self.next_fit_index = (i + 1) % len(self.memory)
-                return True, base, allocated_size
+            if block["type"] == "free":
+                print(f"[Next-Fit]   Trying block of size {block['size']} KB for request {allocated_size} KB")
+                if block["size"] >= allocated_size:
+                    base = self._place(i, seg_name, allocated_size)
+                    # Advance pointer past the just-placed block; wrap with current length
+                    # (_place may have inserted a new block, so re-read len)
+                    self.next_fit_index = (i + 1) % len(self.memory)
+                    return True, base, allocated_size
         return False, 0, 0
 
     def _merge_free_blocks(self):
@@ -122,8 +138,28 @@ class MemoryManager:
 
     # ── public API ────────────────────────────────────────────────────────────
 
+    def set_coalescing_mode(self, mode: str):
+        """Set the coalescing strategy.
+
+        Args:
+            mode: "immediate" or "deferred" (case-insensitive)
+        """
+        self.coalescing_mode = mode.lower()
+
     def allocate_segment(self, seg_name, seg_size, algorithm="First-Fit"):
         """Allocate a segment using the chosen algorithm.
+
+        Flow:
+          Step 1 — Attempt allocation on current memory, no merging.
+          Step 2 — If that fails AND mode is "deferred":
+                     print "Deferred: Trying allocation without merge"  (already
+                     printed at step 1 entry, see below)
+                     Call _merge_free_blocks() exactly once.
+          Step 3 — Retry allocation exactly once.
+          Step 4 — Return result regardless of outcome (no further retries).
+
+        _merge_free_blocks() is NEVER called before the first attempt and is
+        NEVER called in immediate mode from this method.
 
         Args:
             seg_name:  block label, e.g. 'P1 Code'
@@ -141,29 +177,55 @@ class MemoryManager:
             "Next-Fit":  self._next_fit,
         }
         fn = dispatch.get(algorithm, self._first_fit)
-        return fn(seg_name, allocated_size)
+
+        # ── Step 1: first attempt — no merging under any mode ─────────────────
+        if self.coalescing_mode == "deferred":
+            print("Deferred: Trying allocation without merge")
+        success, base, size = fn(seg_name, allocated_size)
+        if success:
+            return success, base, size
+
+        # ── Step 2 & 3: deferred only — merge once, then retry exactly once ───
+        if self.coalescing_mode == "deferred":
+            print("Deferred: Merging and retrying")
+            self._merge_free_blocks()
+            success, base, size = fn(seg_name, allocated_size)
+
+        # ── Step 4: return result (failure if still not allocated) ────────────
+        return success, base, size
 
     def deallocate_process(self, process_name):
-        """Deallocate all segments of a process, then merge adjacent free blocks."""
+        """Deallocate all segments of a process.
+
+        Immediate mode  → merge adjacent free blocks right away.
+        Deferred mode   → leave free blocks unmerged; merging happens lazily
+                          inside allocate_segment when needed.
+        """
         count = 0
         for i, block in enumerate(self.memory):
             if block["name"].startswith(process_name + " "):
                 self.memory[i] = {"name": "Free", "size": block["size"], "type": "free"}
                 count += 1
 
-        if count:
-            # Coalesce adjacent free blocks created by this deallocation
+        if count and self.coalescing_mode == "immediate":
             self._merge_free_blocks()
 
         return count
 
     def deallocate_segment(self, process_name, segment_type):
-        """Deallocate a single named segment — used by rollback in process_manager."""
+        """Deallocate a single named segment — used by rollback in process_manager.
+
+        Respects coalescing_mode: rollback is an internal bookkeeping operation,
+        not a user-visible deallocation, so it follows the same rules.
+        In deferred mode the freed block is left unmerged, consistent with how
+        deallocate_process behaves.
+        """
         seg_label = f"{process_name} {segment_type}"
         for i, block in enumerate(self.memory):
             if block["name"] == seg_label:
                 self.memory[i] = {"name": "Free", "size": block["size"], "type": "free"}
-                self._merge_free_blocks()
+                if self.coalescing_mode == "immediate":
+                    self._merge_free_blocks()
                 return True
         return False
 

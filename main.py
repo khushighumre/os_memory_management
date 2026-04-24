@@ -5,7 +5,7 @@ Integrates all modules into a complete OS Memory Management Simulator
 
 import tkinter as tk
 from tkinter import messagebox, ttk
-from memory_manager import MemoryManager, ALGORITHMS
+from memory_manager import MemoryManager, ALGORITHMS, COALESCING_MODES
 from segment_table import SegmentTable
 from address_translator import AddressTranslator
 from fragmentation_calculator import FragmentationCalculator
@@ -26,6 +26,9 @@ class MemorySimulatorGUI:
         self.frag_calculator = FragmentationCalculator()
         self.process_manager = ProcessManager(self.memory_manager, self.segment_table, self.frag_calculator)
         self.address_translator = AddressTranslator(self.segment_table)
+
+        # Coalescing mode selection (persists across steps)
+        self.coalescing_var = tk.StringVar(value="Immediate")
 
         # Pending process list for compare mode: list of (name, code, data, stack)
         self.pending_processes = []
@@ -57,6 +60,20 @@ class MemorySimulatorGUI:
                 font=("Arial", 13), bg="white", fg="#374151").grid(row=0, column=0, padx=15, pady=15, sticky="w")
         self.memory_size_entry = tk.Entry(input_frame, width=25, font=("Arial", 13), relief="solid", bd=1)
         self.memory_size_entry.grid(row=0, column=1, padx=15, pady=15)
+
+        tk.Label(input_frame, text="Coalescing Mode:", 
+                font=("Arial", 13), bg="white", fg="#374151").grid(row=1, column=0, padx=15, pady=15, sticky="w")
+        coalescing_dropdown = ttk.Combobox(input_frame, textvariable=self.coalescing_var,
+                                           values=COALESCING_MODES, state="readonly",
+                                           width=23, font=("Arial", 13))
+        coalescing_dropdown.grid(row=1, column=1, padx=15, pady=15)
+
+        # Tooltip-style hint label
+        hint_text = ("Immediate: merge free blocks right after deallocation  |  "
+                     "Deferred: merge only when an allocation fails")
+        tk.Label(input_frame, text=hint_text,
+                 font=("Arial", 9), bg="white", fg="#6b7280",
+                 wraplength=420, justify="left").grid(row=2, column=0, columnspan=2, padx=15, pady=(0, 10))
         
         tk.Button(self.frame1, text="Initialize & Continue →", command=self.initialize_memory, 
                  bg="#10b981", fg="white", font=("Arial", 13, "bold"), 
@@ -70,10 +87,12 @@ class MemorySimulatorGUI:
                 raise ValueError
             
             self.memory_manager.initialize_memory(size)
+            self.memory_manager.set_coalescing_mode(self.coalescing_var.get())
             self.segment_table.clear()
             self.frag_calculator.reset()
             
-            messagebox.showinfo("Success", f"Memory initialized with {size} KB")
+            mode_label = self.coalescing_var.get()
+            messagebox.showinfo("Success", f"Memory initialized with {size} KB\nCoalescing mode: {mode_label}")
             self.switch_frames(self.frame1, 2)
         except ValueError:
             messagebox.showerror("Error", "Please enter a valid positive integer")
@@ -90,6 +109,14 @@ class MemorySimulatorGUI:
 
         tk.Label(self.frame2, text="Step 2: Process Management",
                  font=("Arial", 16, "bold"), fg="#1e3a8a", bg="#f0f4f8").pack(pady=10)
+
+        # Active coalescing mode badge
+        mode_color = "#065f46" if self.coalescing_var.get() == "Immediate" else "#92400e"
+        mode_bg    = "#d1fae5" if self.coalescing_var.get() == "Immediate" else "#fef3c7"
+        tk.Label(self.frame2,
+                 text=f"🔀 Coalescing Mode: {self.coalescing_var.get()}",
+                 font=("Arial", 10, "bold"), fg=mode_color, bg=mode_bg,
+                 relief="solid", bd=1, padx=10, pady=4).pack(pady=(0, 8))
 
         # Process input
         input_frame = tk.LabelFrame(self.frame2, text=" ➕ Add New Process ",
@@ -219,6 +246,14 @@ class MemorySimulatorGUI:
         title_frame.pack(fill="x", pady=(0, 15))
         tk.Label(title_frame, text="📊 OS Memory Management Dashboard", 
                 font=("Arial", 20, "bold"), fg="white", bg="#1e3a8a", pady=15).pack()
+
+        # Active coalescing mode badge
+        mode_color = "#065f46" if self.coalescing_var.get() == "Immediate" else "#92400e"
+        mode_bg    = "#d1fae5" if self.coalescing_var.get() == "Immediate" else "#fef3c7"
+        tk.Label(scrollable_frame,
+                 text=f"🔀 Coalescing Mode: {self.coalescing_var.get()}",
+                 font=("Arial", 10, "bold"), fg=mode_color, bg=mode_bg,
+                 relief="solid", bd=1, padx=10, pady=4).pack(pady=(0, 6))
         
         # Memory Visualization
         viz_frame = tk.LabelFrame(scrollable_frame, text=" 💾 Memory Visualization ", 
@@ -470,6 +505,7 @@ class MemorySimulatorGUI:
         self.process_manager = ProcessManager(self.memory_manager, self.segment_table, self.frag_calculator)
         self.address_translator = AddressTranslator(self.segment_table)
         self.pending_processes = []  # Clear compare mode process list
+        # coalescing_var is intentionally kept so the user's choice survives restart
         
         if self.frame3:
             self.switch_frames(self.frame3, 1)

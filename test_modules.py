@@ -99,6 +99,96 @@ def test_process_manager():
     print(f"Memory after deletion: {mm.get_memory_blocks()}")
     print()
 
+def test_coalescing_modes():
+    print("=== Testing Coalescing Modes ===")
+
+    # ── Shared scenario ──────────────────────────────────────────────────────
+    # Memory: 1000 KB
+    # P1: Code=200, Data=100, Stack=50  → 350 KB  (base 0)
+    # P2: Code=150, Data=80,  Stack=30  → 260 KB  (base 350)
+    # P3: Code=100, Data=50,  Stack=20  → 170 KB  (base 610)
+    # Remaining free: 220 KB            (base 780)
+    #
+    # After deleting P2 the freed space is three adjacent blocks:
+    #   150 KB | 80 KB | 30 KB  (total 260 KB, but no single block ≥ 250 KB)
+    #
+    # Allocating 250 KB:
+    #   Immediate → blocks already merged into one 260 KB block → succeeds directly
+    #   Deferred  → largest block is 150 KB → FAILS first attempt
+    #               → merge triggered → 260 KB block created → succeeds on retry
+
+    # ── Test 1: Immediate Coalescing ─────────────────────────────────────────
+    print("\n--- Test 1: Immediate Coalescing ---")
+    mm = MemoryManager()
+    mm.initialize_memory(1000)
+    mm.set_coalescing_mode("immediate")
+
+    st = SegmentTable()
+    fc = FragmentationCalculator()
+    pm = ProcessManager(mm, st, fc)
+
+    pm.create_process("P1", 200, 100, 50)
+    pm.create_process("P2", 150, 80, 30)
+    pm.create_process("P3", 100, 50, 20)
+    print(f"After creating P1, P2, P3: {len(mm.get_memory_blocks())} blocks")
+
+    pm.delete_process("P2")
+    blocks = mm.get_memory_blocks()
+    free_sizes = [b["size"] for b in blocks if b["type"] == "free"]
+    print(f"After deleting P2 (immediate): {len(blocks)} blocks, free blocks: {free_sizes}")
+    print(f"  → Largest free block: {max(free_sizes)} KB  (expect 260 KB — already merged)")
+
+    # 250 KB fits inside the merged 260 KB block → no merge print expected
+    success, base, size = mm.allocate_segment("P4 Code", 250)
+    print(f"Allocate 250 KB: Success={success}, Base={base}  (expect: direct success, no merge message)")
+
+    assert success, "FAIL: immediate mode should allocate 250 KB directly"
+    assert max(free_sizes) >= 250, "FAIL: merged block should be >= 250 KB"
+
+    # ── Test 2: Deferred Coalescing ──────────────────────────────────────────
+    print("\n--- Test 2: Deferred Coalescing ---")
+    mm2 = MemoryManager()
+    mm2.initialize_memory(1000)
+    mm2.set_coalescing_mode("deferred")
+
+    st2 = SegmentTable()
+    fc2 = FragmentationCalculator()
+    pm2 = ProcessManager(mm2, st2, fc2)
+
+    pm2.create_process("P1", 200, 100, 50)
+    pm2.create_process("P2", 150, 80, 30)
+    pm2.create_process("P3", 100, 50, 20)
+    print(f"After creating P1, P2, P3: {len(mm2.get_memory_blocks())} blocks")
+
+    pm2.delete_process("P2")
+    blocks2 = mm2.get_memory_blocks()
+    free_sizes2 = [b["size"] for b in blocks2 if b["type"] == "free"]
+    print(f"After deleting P2 (deferred): {len(blocks2)} blocks, free blocks: {free_sizes2}")
+    print(f"  → Largest free block: {max(free_sizes2)} KB  (expect 150 KB — NOT yet merged)")
+
+    ext_frag = fc2.calculate_external_fragmentation(blocks2)
+    print(f"  → External fragmentation: {ext_frag} KB  (expect > 0)")
+
+    assert max(free_sizes2) < 250, \
+        "FAIL: deferred mode must NOT merge on deallocation — no single block should be >= 250 KB yet"
+    assert ext_frag > 0, "FAIL: deferred mode should show external fragmentation before merge"
+
+    # 250 KB > largest free block (150 KB) → first attempt MUST fail
+    # → merge print should appear → retry succeeds
+    print("\nAttempting to allocate 250 KB (expect: fail → merge → retry → success):")
+    success2, base2, size2 = mm2.allocate_segment("P4 Code", 250)
+    print(f"Allocate 250 KB: Success={success2}, Base={base2}  (expect: True after deferred merge)")
+
+    assert success2, "FAIL: deferred mode should succeed after lazy merge"
+
+    blocks_final = mm2.get_memory_blocks()
+    print(f"Memory after allocation: {blocks_final}")
+
+    print("\n✅ Coalescing modes test PASSED")
+    print("   Immediate: merged on deallocation → direct success, no merge message")
+    print("   Deferred:  unmerged after deallocation → fails first → merge triggered → retry succeeds")
+    print()
+
 if __name__ == "__main__":
     print("Testing all modules independently...\n")
     
@@ -107,6 +197,7 @@ if __name__ == "__main__":
     test_address_translator()
     test_fragmentation_calculator()
     test_process_manager()
+    test_coalescing_modes()
     
     print("=== All tests completed ===")
     print("If no errors above, all modules are working correctly!")
