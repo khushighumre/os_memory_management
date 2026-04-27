@@ -177,6 +177,17 @@ class MemorySimulatorGUI:
                   bg="#ef4444", fg="white", font=("Arial", 11, "bold"),
                   width=20, relief="flat", cursor="hand2").grid(row=1, column=0, columnspan=2, pady=10)
     
+    def update_tlb_display(self):
+        """Refresh TLB statistics display"""
+
+        hit = self.address_translator.tlb.hit_count
+        miss = self.address_translator.tlb.miss_count
+        ratio = self.address_translator.tlb.get_hit_ratio()
+
+        self.tlb_label.config(
+            text=f"TLB Hits: {hit} | TLB Misses: {miss} | Hit Ratio: {ratio}%"
+        )
+
     def add_process(self):
         """Add a process using the selected algorithm"""
         try:
@@ -596,6 +607,7 @@ class MemorySimulatorGUI:
                 raise ValueError("Process and Segment cannot be empty")
             
             success, result, message = self.address_translator.translate(process, segment, offset)
+            self.update_tlb_display()
             
             if success:
                 self.trans_result_label.config(text=f"✅ {message}", fg="#059669", bg="#d1fae5")
@@ -618,7 +630,7 @@ class MemorySimulatorGUI:
             self.show_step2()
         elif show_step == 3:
             self.show_step3()
-    
+            
     def open_compare_mode(self):
         """Open Compare Mode window: runs all algorithms on the same workload"""
         has_add = any(e[0] == "add" for e in self.pending_processes)
