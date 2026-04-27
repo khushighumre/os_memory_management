@@ -155,3 +155,4 @@ class MemoryVisualizer:
                 lx + 18, ry + 7,
                 text=label, font=("Arial", 9), fill="#374151", anchor="w"
             )
+ 

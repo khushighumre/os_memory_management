@@ -30,6 +30,9 @@ class MemorySimulatorGUI:
         # Coalescing mode selection (persists across steps)
         self.coalescing_var = tk.StringVar(value="Immediate")
 
+        # Compaction toggle (persists across steps)
+        self.compaction_var = tk.BooleanVar(value=False)
+
         # Pending process list for compare mode: list of (name, code, data, stack)
         self.pending_processes = []
 
@@ -74,7 +77,26 @@ class MemorySimulatorGUI:
         tk.Label(input_frame, text=hint_text,
                  font=("Arial", 9), bg="white", fg="#6b7280",
                  wraplength=420, justify="left").grid(row=2, column=0, columnspan=2, padx=15, pady=(0, 10))
-        
+
+        # Compaction toggle
+        tk.Label(input_frame, text="Auto-Compaction:",
+                 font=("Arial", 13), bg="white", fg="#374151").grid(row=3, column=0, padx=15, pady=15, sticky="w")
+        compaction_check = tk.Checkbutton(
+            input_frame,
+            text="Enable  (compact memory after every process deletion)",
+            variable=self.compaction_var,
+            font=("Arial", 11), bg="white", fg="#374151",
+            activebackground="white", selectcolor="white",
+            cursor="hand2"
+        )
+        compaction_check.grid(row=3, column=1, padx=15, pady=15, sticky="w")
+
+        compaction_hint = ("When ON: after deleting a process, all used blocks slide to the front\n"
+                           "and all free space is merged into one block at the end.")
+        tk.Label(input_frame, text=compaction_hint,
+                 font=("Arial", 9), bg="white", fg="#6b7280",
+                 wraplength=420, justify="left").grid(row=4, column=0, columnspan=2, padx=15, pady=(0, 10))
+
         tk.Button(self.frame1, text="Initialize & Continue →", command=self.initialize_memory, 
                  bg="#10b981", fg="white", font=("Arial", 13, "bold"), 
                  width=25, height=2, relief="flat", cursor="hand2").pack(pady=20)
@@ -92,7 +114,8 @@ class MemorySimulatorGUI:
             self.frag_calculator.reset()
             
             mode_label = self.coalescing_var.get()
-            messagebox.showinfo("Success", f"Memory initialized with {size} KB\nCoalescing mode: {mode_label}")
+            compact_label = "ON" if self.compaction_var.get() else "OFF"
+            messagebox.showinfo("Success", f"Memory initialized with {size} KB\nCoalescing mode: {mode_label}\nAuto-Compaction: {compact_label}")
             self.switch_frames(self.frame1, 2)
         except ValueError:
             messagebox.showerror("Error", "Please enter a valid positive integer")
@@ -116,6 +139,15 @@ class MemorySimulatorGUI:
         tk.Label(self.frame2,
                  text=f"🔀 Coalescing Mode: {self.coalescing_var.get()}",
                  font=("Arial", 10, "bold"), fg=mode_color, bg=mode_bg,
+                 relief="solid", bd=1, padx=10, pady=4).pack(pady=(0, 4))
+
+        # Active compaction badge
+        cmp_on = self.compaction_var.get()
+        tk.Label(self.frame2,
+                 text=f"🗜️ Auto-Compaction: {'ON' if cmp_on else 'OFF'}",
+                 font=("Arial", 10, "bold"),
+                 fg="#1e40af" if cmp_on else "#6b7280",
+                 bg="#dbeafe" if cmp_on else "#f3f4f6",
                  relief="solid", bd=1, padx=10, pady=4).pack(pady=(0, 8))
 
         # Process input
@@ -219,6 +251,12 @@ class MemorySimulatorGUI:
             if success:
                 # Record deletion in workload for compare mode: ("delete", name)
                 self.pending_processes.append(("delete", process_name))
+
+                # Auto-compaction: slide used blocks to front, merge all free space
+                if self.compaction_var.get():
+                    self.memory_manager.compact_memory(self.segment_table)
+                    message += "  |  Memory compacted ✅"
+
                 messagebox.showinfo("Success", message)
                 self.delete_process_entry.delete(0, tk.END)
             else:
@@ -253,6 +291,15 @@ class MemorySimulatorGUI:
         tk.Label(scrollable_frame,
                  text=f"🔀 Coalescing Mode: {self.coalescing_var.get()}",
                  font=("Arial", 10, "bold"), fg=mode_color, bg=mode_bg,
+                 relief="solid", bd=1, padx=10, pady=4).pack(pady=(0, 4))
+
+        # Active compaction badge
+        cmp_on = self.compaction_var.get()
+        tk.Label(scrollable_frame,
+                 text=f"🗜️ Auto-Compaction: {'ON' if cmp_on else 'OFF'}",
+                 font=("Arial", 10, "bold"),
+                 fg="#1e40af" if cmp_on else "#6b7280",
+                 bg="#dbeafe" if cmp_on else "#f3f4f6",
                  relief="solid", bd=1, padx=10, pady=4).pack(pady=(0, 6))
         
         # Memory Visualization
@@ -505,7 +552,8 @@ class MemorySimulatorGUI:
         self.process_manager = ProcessManager(self.memory_manager, self.segment_table, self.frag_calculator)
         self.address_translator = AddressTranslator(self.segment_table)
         self.pending_processes = []  # Clear compare mode process list
-        # coalescing_var is intentionally kept so the user's choice survives restart
+        # coalescing_var and compaction_var are intentionally kept so the user's
+        # choices survive restart
         
         if self.frame3:
             self.switch_frames(self.frame3, 1)
