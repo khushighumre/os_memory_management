@@ -230,138 +230,352 @@ class MemorySimulatorGUI:
         """Step 3: Dashboard"""
         self.frame3 = tk.Frame(self.root, bg="#f0f4f8")
         self.frame3.pack(fill="both", expand=True)
-        
+
         main_canvas = tk.Canvas(self.frame3, bg="#f0f4f8")
         scrollbar = tk.Scrollbar(self.frame3, orient="vertical", command=main_canvas.yview)
         scrollable_frame = tk.Frame(main_canvas, bg="#f0f4f8")
-        
-        scrollable_frame.bind("<Configure>", lambda e: main_canvas.configure(scrollregion=main_canvas.bbox("all")))
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: main_canvas.configure(scrollregion=main_canvas.bbox("all"))
+        )
+
         main_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         main_canvas.configure(yscrollcommand=scrollbar.set)
-        
+
         main_canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        
-        title_frame = tk.Frame(scrollable_frame, bg="#1e3a8a", relief="flat")
-        title_frame.pack(fill="x", pady=(0, 15))
-        tk.Label(title_frame, text="📊 OS Memory Management Dashboard", 
-                font=("Arial", 20, "bold"), fg="white", bg="#1e3a8a", pady=15).pack()
 
-        # Active coalescing mode badge
+        # =========================================================
+        # TITLE
+        # =========================================================
+
+        title_frame = tk.Frame(scrollable_frame, bg="#1e3a8a")
+        title_frame.pack(fill="x", pady=(0, 15))
+
+        tk.Label(
+            title_frame,
+            text="📊 OS Memory Management Dashboard",
+            font=("Arial", 20, "bold"),
+            fg="white",
+            bg="#1e3a8a",
+            pady=15
+        ).pack()
+
+        # =========================================================
+        # COALESCING MODE BADGE
+        # =========================================================
+
         mode_color = "#065f46" if self.coalescing_var.get() == "Immediate" else "#92400e"
-        mode_bg    = "#d1fae5" if self.coalescing_var.get() == "Immediate" else "#fef3c7"
-        tk.Label(scrollable_frame,
-                 text=f"🔀 Coalescing Mode: {self.coalescing_var.get()}",
-                 font=("Arial", 10, "bold"), fg=mode_color, bg=mode_bg,
-                 relief="solid", bd=1, padx=10, pady=4).pack(pady=(0, 6))
-        
-        # Memory Visualization
-        viz_frame = tk.LabelFrame(scrollable_frame, text=" 💾 Memory Visualization ", 
-                                  font=("Arial", 12, "bold"), padx=15, pady=15,
-                                  bg="white", fg="#1e3a8a", relief="raised", bd=2)
+        mode_bg = "#d1fae5" if self.coalescing_var.get() == "Immediate" else "#fef3c7"
+
+        tk.Label(
+            scrollable_frame,
+            text=f"🔀 Coalescing Mode: {self.coalescing_var.get()}",
+            font=("Arial", 10, "bold"),
+            fg=mode_color,
+            bg=mode_bg,
+            relief="solid",
+            bd=1,
+            padx=10,
+            pady=4
+        ).pack(pady=(0, 6))
+
+        # =========================================================
+        # MEMORY VISUALIZATION
+        # =========================================================
+
+        viz_frame = tk.LabelFrame(
+            scrollable_frame,
+            text=" 💾 Memory Visualization ",
+            font=("Arial", 12, "bold"),
+            padx=15,
+            pady=15,
+            bg="white",
+            fg="#1e3a8a",
+            relief="raised",
+            bd=2
+        )
         viz_frame.pack(padx=20, pady=10, fill="x")
-        
-        self.canvas = tk.Canvas(viz_frame, width=900, bg="#f9fafb", relief="solid", borderwidth=1, highlightthickness=0)
+
+        self.canvas = tk.Canvas(
+            viz_frame,
+            width=900,
+            bg="#f9fafb",
+            relief="solid",
+            borderwidth=1,
+            highlightthickness=0
+        )
         self.canvas.pack(pady=10, fill="x")
-        
-        self.visualizer = MemoryVisualizer(self.canvas, self.memory_manager.total_memory)
-        self.visualizer.draw_memory_blocks(self.memory_manager.get_memory_blocks())
-        
-        # Fragmentation
-        frag_frame = tk.LabelFrame(scrollable_frame, text=" ⚠️ Fragmentation Analysis ", 
-                                   font=("Arial", 12, "bold"), padx=15, pady=15,
-                                   bg="white", fg="#1e3a8a", relief="raised", bd=2)
+
+        self.visualizer = MemoryVisualizer(
+            self.canvas,
+            self.memory_manager.total_memory
+        )
+        self.visualizer.draw_memory_blocks(
+            self.memory_manager.get_memory_blocks()
+        )
+
+        # =========================================================
+        # FRAGMENTATION
+        # =========================================================
+
+        frag_frame = tk.LabelFrame(
+            scrollable_frame,
+            text=" ⚠️ Fragmentation Analysis ",
+            font=("Arial", 12, "bold"),
+            padx=15,
+            pady=15,
+            bg="white",
+            fg="#1e3a8a",
+            relief="raised",
+            bd=2
+        )
         frag_frame.pack(padx=20, pady=10, fill="x")
-        
+
         stats_container = tk.Frame(frag_frame, bg="white")
         stats_container.pack(pady=5)
-        
-        ext_frag = self.frag_calculator.calculate_external_fragmentation(self.memory_manager.get_memory_blocks())
-        ext_frame = tk.Frame(stats_container, bg="#fef2f2", relief="solid", bd=1)
+
+        ext_frag = self.frag_calculator.calculate_external_fragmentation(
+            self.memory_manager.get_memory_blocks()
+        )
+
+        ext_frame = tk.Frame(
+            stats_container,
+            bg="#fef2f2",
+            relief="solid",
+            bd=1
+        )
         ext_frame.pack(side="left", padx=15, pady=5, ipadx=20, ipady=10)
-        self.ext_frag_label = tk.Label(ext_frame, text=f"🔴 External Fragmentation: {ext_frag} KB", 
-                                       font=("Arial", 11, "bold"), fg="#dc2626", bg="#fef2f2")
+
+        self.ext_frag_label = tk.Label(
+            ext_frame,
+            text=f"🔴 External Fragmentation: {ext_frag} KB",
+            font=("Arial", 11, "bold"),
+            fg="#dc2626",
+            bg="#fef2f2"
+        )
         self.ext_frag_label.pack()
-        
+
         int_frag = self.frag_calculator.get_internal_fragmentation()
-        int_frame = tk.Frame(stats_container, bg="#fff7ed", relief="solid", bd=1)
+
+        int_frame = tk.Frame(
+            stats_container,
+            bg="#fff7ed",
+            relief="solid",
+            bd=1
+        )
         int_frame.pack(side="left", padx=15, pady=5, ipadx=20, ipady=10)
-        self.int_frag_label = tk.Label(int_frame, text=f"🟡 Internal Fragmentation: {int_frag} KB", 
-                                       font=("Arial", 11, "bold"), fg="#ea580c", bg="#fff7ed")
+
+        self.int_frag_label = tk.Label(
+            int_frame,
+            text=f"🟡 Internal Fragmentation: {int_frag} KB",
+            font=("Arial", 11, "bold"),
+            fg="#ea580c",
+            bg="#fff7ed"
+        )
         self.int_frag_label.pack()
-        
-        # Segment Table
-        seg_frame = tk.LabelFrame(scrollable_frame, text=" 📋 Segment Table ", 
-                                  font=("Arial", 12, "bold"), padx=15, pady=15,
-                                  bg="white", fg="#1e3a8a", relief="raised", bd=2)
+
+        # =========================================================
+        # SEGMENT TABLE
+        # =========================================================
+
+        seg_frame = tk.LabelFrame(
+            scrollable_frame,
+            text=" 📋 Segment Table ",
+            font=("Arial", 12, "bold"),
+            padx=15,
+            pady=15,
+            bg="white",
+            fg="#1e3a8a",
+            relief="raised",
+            bd=2
+        )
         seg_frame.pack(padx=20, pady=10, fill="both", expand=True)
-        
+
         style = ttk.Style()
         style.theme_use("clam")
-        style.configure("Treeview", background="#f9fafb", foreground="#1f2937", 
-                       rowheight=28, fieldbackground="#f9fafb", font=("Arial", 10))
-        style.configure("Treeview.Heading", background="#3b82f6", foreground="white", 
-                       font=("Arial", 11, "bold"), relief="flat")
-        style.map("Treeview", background=[("selected", "#60a5fa")])
-        
-        self.segment_tree = ttk.Treeview(seg_frame, columns=("Process", "Segment", "Base", "Size"), 
-                                         show="headings", height=6)
+
+        style.configure(
+            "Treeview",
+            background="#f9fafb",
+            foreground="#1f2937",
+            rowheight=28,
+            fieldbackground="#f9fafb",
+            font=("Arial", 10)
+        )
+
+        style.configure(
+            "Treeview.Heading",
+            background="#3b82f6",
+            foreground="white",
+            font=("Arial", 11, "bold"),
+            relief="flat"
+        )
+
+        self.segment_tree = ttk.Treeview(
+            seg_frame,
+            columns=("Process", "Segment", "Base", "Size"),
+            show="headings",
+            height=6
+        )
+
         self.segment_tree.heading("Process", text="Process ID")
         self.segment_tree.heading("Segment", text="Segment Name")
         self.segment_tree.heading("Base", text="Base Address")
         self.segment_tree.heading("Size", text="Size (KB)")
-        
+
         self.segment_tree.column("Process", width=200, anchor="center")
         self.segment_tree.column("Segment", width=200, anchor="center")
         self.segment_tree.column("Base", width=200, anchor="center")
         self.segment_tree.column("Size", width=200, anchor="center")
-        
+
         self.segment_tree.pack(pady=10, fill="both", expand=True)
+
         self.populate_segment_table()
-        
-        # Address Translation
-        addr_frame = tk.LabelFrame(scrollable_frame, text=" 🔄 Address Translation ", 
-                                   font=("Arial", 12, "bold"), padx=15, pady=15,
-                                   bg="white", fg="#1e3a8a", relief="raised", bd=2)
+
+        # =========================================================
+        # ADDRESS TRANSLATION
+        # =========================================================
+
+        addr_frame = tk.LabelFrame(
+            scrollable_frame,
+            text=" 🔄 Address Translation ",
+            font=("Arial", 12, "bold"),
+            padx=15,
+            pady=15,
+            bg="white",
+            fg="#1e3a8a",
+            relief="raised",
+            bd=2
+        )
         addr_frame.pack(padx=20, pady=10, fill="x")
-        
+
         input_frame = tk.Frame(addr_frame, bg="white")
         input_frame.pack(pady=10)
-        
-        tk.Label(input_frame, text="Process ID:", font=("Arial", 10, "bold"), bg="white", fg="#374151").grid(row=0, column=0, padx=8, pady=8)
-        self.trans_process_entry = tk.Entry(input_frame, width=15, font=("Arial", 10), relief="solid", bd=1)
+
+        tk.Label(
+            input_frame,
+            text="Process ID:",
+            font=("Arial", 10, "bold"),
+            bg="white"
+        ).grid(row=0, column=0, padx=8, pady=8)
+
+        self.trans_process_entry = tk.Entry(input_frame, width=15)
         self.trans_process_entry.grid(row=0, column=1, padx=8, pady=8)
-        
-        tk.Label(input_frame, text="Segment:", font=("Arial", 10, "bold"), bg="white", fg="#374151").grid(row=0, column=2, padx=8, pady=8)
-        self.trans_segment_entry = tk.Entry(input_frame, width=15, font=("Arial", 10), relief="solid", bd=1)
+
+        tk.Label(
+            input_frame,
+            text="Segment:",
+            font=("Arial", 10, "bold"),
+            bg="white"
+        ).grid(row=0, column=2, padx=8, pady=8)
+
+        self.trans_segment_entry = tk.Entry(input_frame, width=15)
         self.trans_segment_entry.grid(row=0, column=3, padx=8, pady=8)
-        
-        tk.Label(input_frame, text="Offset:", font=("Arial", 10, "bold"), bg="white", fg="#374151").grid(row=0, column=4, padx=8, pady=8)
-        self.trans_offset_entry = tk.Entry(input_frame, width=15, font=("Arial", 10), relief="solid", bd=1)
+
+        tk.Label(
+            input_frame,
+            text="Offset:",
+            font=("Arial", 10, "bold"),
+            bg="white"
+        ).grid(row=0, column=4, padx=8, pady=8)
+
+        self.trans_offset_entry = tk.Entry(input_frame, width=15)
         self.trans_offset_entry.grid(row=0, column=5, padx=8, pady=8)
-        
-        tk.Button(addr_frame, text="➡️ Translate Address", command=self.translate_address, 
-                 bg="#10b981", fg="white", font=("Arial", 11, "bold"), 
-                 width=22, relief="flat", cursor="hand2").pack(pady=10)
-        
-        result_container = tk.Frame(addr_frame, bg="#eff6ff", relief="solid", bd=1)
+
+        tk.Button(
+            addr_frame,
+            text="➡️ Translate Address",
+            command=self.translate_address,
+            bg="#10b981",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            width=22
+        ).pack(pady=10)
+
+        result_container = tk.Frame(
+            addr_frame,
+            bg="#eff6ff",
+            relief="solid",
+            bd=1
+        )
         result_container.pack(pady=10, padx=20, fill="x", ipady=10)
-        self.trans_result_label = tk.Label(result_container, text="Enter values and click Translate", 
-                                          font=("Arial", 11, "bold"), fg="#3b82f6", bg="#eff6ff")
+
+        self.trans_result_label = tk.Label(
+            result_container,
+            text="Enter values and click Translate",
+            font=("Arial", 11, "bold"),
+            fg="#3b82f6",
+            bg="#eff6ff"
+        )
         self.trans_result_label.pack()
-        
-        # Buttons
+
+        # =========================================================
+        # TLB STATISTICS (CORRECT PLACE)
+        # =========================================================
+
+        tlb_frame = tk.LabelFrame(
+            scrollable_frame,
+            text=" ⚡ TLB Statistics ",
+            font=("Arial", 12, "bold"),
+            padx=15,
+            pady=15,
+            bg="white",
+            fg="#1e3a8a",
+            relief="raised",
+            bd=2
+        )
+        tlb_frame.pack(padx=20, pady=10, fill="x")
+
+        hit = self.address_translator.tlb.hit_count
+        miss = self.address_translator.tlb.miss_count
+        ratio = self.address_translator.tlb.get_hit_ratio()
+
+        self.tlb_label = tk.Label(
+            tlb_frame,
+            text=f"TLB Hits: {hit} | TLB Misses: {miss} | Hit Ratio: {ratio}%",
+            font=("Arial", 11, "bold"),
+            bg="white",
+            fg="#059669"
+        )
+        self.tlb_label.pack(pady=10)
+
+        for entry in self.address_translator.tlb.get_entries():
+            tk.Label(
+                tlb_frame,
+                text=f"{entry['process']} | {entry['segment']} → Base: {entry['base']} KB",
+                font=("Arial", 10),
+                bg="white",
+                fg="#374151"
+            ).pack(anchor="w")
+
+        # =========================================================
+        # BUTTONS (LAST)
+        # =========================================================
+
         button_frame = tk.Frame(scrollable_frame, bg="#f0f4f8")
         button_frame.pack(pady=20)
-        
-        tk.Button(button_frame, text="← Back to Processes", 
-                 command=lambda: self.switch_frames(self.frame3, 2), 
-                 bg="#6b7280", fg="white", font=("Arial", 11, "bold"), 
-                 width=22, relief="flat", cursor="hand2").pack(side="left", padx=8)
-        
-        tk.Button(button_frame, text="🔄 Restart Simulator", command=self.restart, 
-                 bg="#dc2626", fg="white", font=("Arial", 11, "bold"), 
-                 width=22, relief="flat", cursor="hand2").pack(side="left", padx=8)
+
+        tk.Button(
+            button_frame,
+            text="← Back to Processes",
+            command=lambda: self.switch_frames(self.frame3, 2),
+            bg="#6b7280",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            width=22
+        ).pack(side="left", padx=8)
+
+        tk.Button(
+            button_frame,
+            text="🔄 Restart Simulator",
+            command=self.restart,
+            bg="#dc2626",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            width=22
+        ).pack(side="left", padx=8)
     
     def populate_segment_table(self):
         """Populate segment table"""
@@ -499,20 +713,33 @@ class MemorySimulatorGUI:
 
     def restart(self):
         """Restart simulator"""
+
         self.memory_manager = MemoryManager()
         self.segment_table = SegmentTable()
         self.frag_calculator = FragmentationCalculator()
-        self.process_manager = ProcessManager(self.memory_manager, self.segment_table, self.frag_calculator)
+
+        self.process_manager = ProcessManager(
+            self.memory_manager,
+            self.segment_table,
+            self.frag_calculator
+        )
+
         self.address_translator = AddressTranslator(self.segment_table)
+
         self.pending_processes = []  # Clear compare mode process list
-        # coalescing_var is intentionally kept so the user's choice survives restart
-        
+
+        # coalescing_var is intentionally kept
+        # so user's choice survives restart
+
         if self.frame3:
             self.switch_frames(self.frame3, 1)
         elif self.frame2:
             self.switch_frames(self.frame2, 1)
-        
-        messagebox.showinfo("Restart", "Simulator restarted. Please initialize memory.")
+
+        messagebox.showinfo(
+            "Restart",
+            "Simulator restarted. Please initialize memory."
+        )
 
 if __name__ == "__main__":
     root = tk.Tk()
