@@ -289,8 +289,14 @@ class MemorySimulatorGUI:
             lambda e: main_canvas.configure(scrollregion=main_canvas.bbox("all"))
         )
 
-        main_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         main_canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Keep scrollable_frame width in sync with the canvas so content stays centred
+        def _on_canvas_resize(event):
+            main_canvas.itemconfig(canvas_window, width=event.width)
+
+        canvas_window = main_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        main_canvas.bind("<Configure>", _on_canvas_resize)
 
         main_canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
